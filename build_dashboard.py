@@ -1,4 +1,5 @@
 import json
+import urllib.parse
 from pathlib import Path
 
 # Read the dashboard template
@@ -9,10 +10,10 @@ html_content = template_path.read_text(encoding="utf-8")
 with open("/Users/iananderson/Documents/Assign1/dashboard_data.json") as f:
     data = json.load(f)
 
-# Replace the placeholder with actual data as a properly encoded string
+# Replace the placeholder with actual data as URL-encoded string
 data_json = json.dumps(data, separators=(',', ':'))
-data_encoded = data_json.replace('%', '%25').replace('"', '%22')
-html_content = html_content.replace('JSON.parse(decodeURIComponent("%DASHBOARD_DATA_PLACEHOLDER%"))', f'JSON.parse("{data_encoded}")')
+data_encoded = urllib.parse.quote(data_json, safe='')
+html_content = html_content.replace('JSON.parse("%DASHBOARD_DATA_PLACEHOLDER%")', f'JSON.parse(decodeURIComponent("{data_encoded}"))')
 
 # Write the final dashboard
 final_path = Path("/Users/iananderson/Documents/Assign1/dashboard.html")

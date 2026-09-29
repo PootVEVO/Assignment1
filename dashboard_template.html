@@ -261,7 +261,7 @@ th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: 
 </div>
 
 <script>
-const DATA = JSON.parse(decodeURIComponent("%DASHBOARD_DATA_PLACEHOLDER%"));
+const DATA = JSON.parse("%DASHBOARD_DATA_PLACEHOLDER%");
 
 // Render metrics
 document.getElementById('metrics-step2').innerHTML = `
@@ -307,14 +307,17 @@ const commonOptions = {
   plugins: { legend: { labels: { color: '#8b8fa3', font: { size: 11 } } } }
 };
 
-// Accuracy bar (2-class)
+// Accuracy bar (2-class) - compute from confusion matrix
+var pos2_acc = ((DATA.step2.pos_total > 0) ? (DATA.step2.tp / DATA.step2.pos_total * 100) : 0).toFixed(1);
+var neg2_acc = ((DATA.step2.neg_total > 0) ? (DATA.step2.tn / DATA.step2.neg_total * 100) : 0).toFixed(1);
+var acc2_data = [parseFloat(pos2_acc), parseFloat(neg2_acc)];
 new Chart(document.getElementById('accuracy-bar'), {
   type: 'bar',
   data: {
     labels: ['POSITIVE', 'NEGATIVE'],
     datasets: [{
       label: 'Per-Class Accuracy (%)',
-      data: [DATA.step2.perClassAccuracy.POSITIVE, DATA.step2.perClassAccuracy.NEGATIVE],
+      data: acc2_data,
       backgroundColor: ['#22c55e', '#ef4444'],
       borderRadius: 6,
     }]
@@ -488,6 +491,27 @@ new Chart(document.getElementById('emotion-by-sentiment'), {
     scales: {
       x: { stacked: true, grid: { display: false }, ticks: { color: '#8b8fa3' } },
       y: { stacked: true, grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Star bar chart (full dataset summary)
+new Chart(document.getElementById('star-bar-chart'), {
+  type: 'bar',
+  data: {
+    labels: DATA.stars.map(s => s[0]),
+    datasets: [{
+      label: 'Count',
+      data: DATA.stars.map(s => s[1]),
+      backgroundColor: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#22c55e'],
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    ...commonOptions,
+    scales: {
+      y: { grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } },
+      x: { grid: { display: false }, ticks: { color: '#8b8fa3', maxRotation: 45 } }
     }
   }
 });
