@@ -99,25 +99,26 @@ Open `dashboard.html` in any browser. Fully self-contained — no server or netw
 | Accuracy | **69.3%** |
 | Sample Distribution | 50 POS / 50 NEG / 50 NEUTRAL |
 
-| Class | True Count | Predicted | Accuracy |
-|-------|-----------|-----------|----------|
-| POSITIVE | 47 | 48 | **57%** (27/47) |
-| NEGATIVE | 53 | 53 | **41%** (22/53) |
-| NEUTRAL | 50 | 49 | **20%** (10/50) |
+|| Class | True Count | Predicted | Accuracy |
+||-------|-----------|-----------|----------|
+|| POSITIVE | 50 | 50 | **88.0%** (44/50) |
+|| NEGATIVE | 50 | 87 | **100%** (50/50) |
+|| NEUTRAL | 50 | 13 | **20.0%** (10/50) |
 
 **Confusion Matrix:**
 ```
                 Predicted
                 POS   NEG   NEU
-Actual POS      27     3     2
-Actual NEG       0    22     2
-Actual NEUT      6    30     10
+Actual POS      44     3     3
+Actual NEG       0    50     0
+Actual NEUT      6    34    10
 ```
 
 **Key Findings:**
-- **NEUTRAL is the hardest class** — only 20% accuracy. The model conflates neutral reviews with negative ones (30 of 50 neutral reviews were misclassified as NEGATIVE).
-- **3-class degrades performance:** Adding NEUTRAL as a class drops accuracy by 14 percentage points from the 2-class result, even on a balanced sample.
-- The model is overly aggressive in predicting NEGATIVE — it predicts NEGATIVE 53 times when the true distribution is only 53 NEGATIVE, but 30 of those are false negatives from neutral reviews.
+- **NEUTRAL is the hardest class** — only 20% accuracy. The model conflates neutral reviews with negative ones (34 of 50 neutral reviews were misclassified as NEGATIVE).
+- **NEGATIVE is predicted 100% correctly** — but this is misleading: the model predicts NEGATIVE 87 times because it dumps nearly all ambiguous reviews there. True NEUTRAL reviews (34) and even POSITIVE reviews (6) get swallowed.
+- **POSITIVE accuracy is high (88%)** because the model still has trouble distinguishing neutral-leaning POSITIVE reviews, sending 6 of them to NEGATIVE and 3 to NEUTRAL.
+- **Class imbalance hides in predictions:** even with a balanced sample, the model's predictions are heavily skewed: 87/150 NEGATIVE vs 50 POSITIVE vs 13 NEUTRAL.
 
 ### Step 5 — Emotion Detection
 
@@ -125,12 +126,12 @@ Actual NEUT      6    30     10
 |--------|-------------|
 | LLM | Anger (66), Joy (50), Trust (10), Disgust (10) |
 | NRC Lexicon | Anticipation (79), Anger (13), Joy (12), Trust (7) |
-| Cross-Method Agreement | **10%** (15/150) |
+|| Cross-Method Agreement | **12.5%** (15/120) |
 
 **Key Findings:**
 - The LLM heavily clusters around **anger** and **joy**, reflecting the polarized nature of the Amazon reviews.
 - The NRC lexicon heavily favors **anticipation** (a generic, high-frequency English word), producing a very different distribution.
-- Only 10% agreement between methods, highlighting the fundamental difference between context-aware LLM reasoning and word-list matching.
+- Only 12.5% agreement (15/120 reviews with both predictions) between methods, highlighting the fundamental difference between context-aware LLM reasoning and word-list matching.
 - Emotion distributions vary significantly by true sentiment: POSITIVE reviews predict joy 45/50 times, while NEUTRAL reviews show the most diverse emotion spread.
 
 ## Dashboard
@@ -164,4 +165,4 @@ The self-contained interactive dashboard (`dashboard.html`) includes:
 - The 100-review sample (Step 2) is the **first 100 in file order**, which is biased toward positive reviews. Results are not representative of the full dataset.
 - The NRC lexicon approach has inherent limitations: word-level matching ignores context, negation, and sarcasm.
 - The LLM emotion detection heavily clusters around anger/joy, possibly reflecting the model's training data patterns rather than true emotion distributions.
-- Cross-method agreement of 10% is low but expected given the fundamentally different approaches.
+- Cross-method agreement of 12.5% is low but expected given the fundamentally different approaches.
