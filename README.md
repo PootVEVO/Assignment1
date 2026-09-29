@@ -1,25 +1,25 @@
-# MBAX 6418 — Assignment 1: Sentiment & Emotion Classification of Amazon Reviews
+# MBAX 6418 - Assignment 1: Sentiment & Emotion Classification of Amazon Reviews
 
 LLM-powered sentiment classification and emotion analysis of Amazon Gift Card reviews, with a self-contained interactive dashboard.
 
 ## Data
 
-**Source:** McAuley Lab, Amazon 2023 — "Gift Cards" review category
+**Source:** McAuley Lab, Amazon 2023 - "Gift Cards" review category
 - **File:** `Gift_Cards.jsonl.gz`
 - **URL:** `https://mcauleylab.ucsd.edu/public_datasets/data/amazon_2023/raw/review_categories/Gift_Cards.jsonl.gz`
 - **Total reviews:** 152,410 (verified by JSON parsing)
 
-Each review contains: `title`, `text`, `rating` (1.0–5.0), `category`, `timestamp`, etc.
+Each review contains: `title`, `text`, `rating` (1.0-5.0), `category`, `timestamp`, etc.
 
 ## Project Structure
 
 ```
 Assign1/
 ├── Gift_Cards.jsonl.gz              # Raw dataset (152,410 reviews)
-├── sentiment.py                     # Step 1, 2, 6 — Sentiment classification
-├── emotions.py                      # Step 5 — Emotion detection (LLM + NRC)
+├── sentiment.py                     # Step 1, 2, 6 - Sentiment classification
+├── emotions.py                      # Step 5 - Emotion detection (LLM + NRC)
 ├── complete_emotions.py             # Helper: completes partial LLM runs
-├── dashboard.html                   # Step 3/4 — Interactive visualization dashboard
+├── dashboard.html                   # Step 3/4 - Interactive visualization dashboard
 ├── dashboard_screenshot.png         # Dashboard screenshot for README
 ├── README.md                        # This file
 │
@@ -47,19 +47,19 @@ Assign1/
 pip install openai
 ```
 
-### 2. Step 1 & 2 — Sentiment Classification (100 reviews)
+### 2. Step 1 & 2 - Sentiment Classification (100 reviews)
 
 ```bash
 python sentiment.py --first 100 --output first_100_results.jsonl
 ```
 
-### 3. Step 6 — Balanced 3-Class Classification (150 reviews)
+### 3. Step 6 - Balanced 3-Class Classification (150 reviews)
 
 ```bash
 python sentiment.py --balanced --output balanced_3class_results.jsonl
 ```
 
-### 4. Step 5 — Emotion Detection
+### 4. Step 5 - Emotion Detection
 
 ```bash
 # NRC lexicon-based (fast, no LLM calls)
@@ -72,13 +72,13 @@ python emotions.py --input balanced_3class_results.jsonl --method llm --output b
 python emotions.py --input balanced_3class_results.jsonl --method both --output balanced_3class_emotions.jsonl
 ```
 
-### 5. Step 3/4 — Dashboard
+### 5. Step 3/4 - Dashboard
 
-Open `dashboard.html` in any browser. Fully self-contained — no server or network needed.
+Open `dashboard.html` in any browser. Fully self-contained - no server or network needed.
 
 ## Results Summary
 
-### Step 2 — 100 Reviews (First 100 in File Order)
+### Step 2 - 100 Reviews (First 100 in File Order)
 
 | Metric | Value |
 |--------|-------|
@@ -92,7 +92,7 @@ Open `dashboard.html` in any browser. Fully self-contained — no server or netw
 
 **Key Finding:** The model achieves 83% accuracy on the raw sample, but this sample is heavily biased toward POSITIVE reviews (93% are 5-star). The model effectively defaults to POSITIVE, so the high accuracy is misleading.
 
-### Step 6 — 150 Reviews (Balanced 3-Class)
+### Step 6 - 150 Reviews (Balanced 3-Class)
 
 | Metric | Value |
 |--------|-------|
@@ -115,12 +115,12 @@ Actual NEUT      6    34    10
 ```
 
 **Key Findings:**
-- **NEUTRAL is the hardest class** — only 20% accuracy. The model conflates neutral reviews with negative ones (34 of 50 neutral reviews were misclassified as NEGATIVE).
-- **NEGATIVE is predicted 100% correctly** — but this is misleading: the model predicts NEGATIVE 87 times because it dumps nearly all ambiguous reviews there. True NEUTRAL reviews (34) and even POSITIVE reviews (6) get swallowed.
+- **NEUTRAL is the hardest class** - only 20% accuracy. The model conflates neutral reviews with negative ones (34 of 50 neutral reviews were misclassified as NEGATIVE).
+- **NEGATIVE is predicted 100% correctly** - but this is misleading: the model predicts NEGATIVE 87 times because it dumps nearly all ambiguous reviews there. True NEUTRAL reviews (34) and even POSITIVE reviews (6) get swallowed.
 - **POSITIVE accuracy is high (88%)** because the model still has trouble distinguishing neutral-leaning POSITIVE reviews, sending 6 of them to NEGATIVE and 3 to NEUTRAL.
 - **Class imbalance hides in predictions:** even with a balanced sample, the model's predictions are heavily skewed: 87/150 NEGATIVE vs 50 POSITIVE vs 13 NEUTRAL.
 
-### Step 5 — Emotion Detection
+### Step 5 - Emotion Detection
 
 | Method | Top Emotions |
 |--------|-------------|
@@ -151,7 +151,7 @@ The self-contained interactive dashboard (`dashboard.html`) includes:
 
 1. **Prompt engineering:** Used structured prompts with clear rules and few-shot examples to guide the model's chain-of-thought toward a single-word classification.
 
-2. **Reasoning field parsing:** Since the model outputs to `reasoning` (not `content`), parsers scan the output from the **end** to find the final classification/emotion label. Initial runs (before fix) found labels early in the reasoning chain, producing 100% POSITIVE output — corrected by scanning from the end.
+2. **Reasoning field parsing:** Since the model outputs to `reasoning` (not `content`), parsers scan the output from the **end** to find the final classification/emotion label. Initial runs (before fix) found labels early in the reasoning chain, producing 100% POSITIVE output - corrected by scanning from the end.
 
 3. **Balanced sampling:** For the 3-class task, used a stratified sample (50 per class) rather than taking the first N reviews, to ensure NEUTRAL reviews are represented.
 
