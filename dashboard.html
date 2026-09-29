@@ -1,0 +1,613 @@
+import json
+
+# Load dashboard data
+with open("/Users/iananderson/Documents/Assign1/dashboard_data.json") as f:
+    data = json.load(f)
+
+# Build the complete dashboard HTML with correct data, interactive filtering, and star rating chart
+html = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentiment & Emotion Classification Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0f1117;
+  --card: #181a24;
+  --border: #2a2d3a;
+  --text: #e2e4eb;
+  --muted: #8b8fa3;
+  --accent: #6366f1;
+  --accent2: #22d3ee;
+  --green: #22c55e;
+  --red: #ef4444;
+  --yellow: #eab308;
+  --orange: #f97316;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  padding: 2rem;
+}
+h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
+.subtitle { color: var(--muted); margin-bottom: 2rem; font-size: 0.9rem; }
+.grid { display: grid; gap: 1.25rem; }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+.card h3 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+.metric { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+.metric.green { color: var(--green); }
+.metric.red { color: var(--red); }
+.metric.accent { color: var(--accent); }
+.metric.accent2 { color: var(--accent2); }
+.metric.yellow { color: var(--yellow); }
+.metric.orange { color: var(--orange); }
+.metric-label { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+.chart-container { position: relative; height: 280px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.badge { display: inline-block; padding: 0.15em 0.5em; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
+.badge.positive { background: rgba(34,197,94,0.15); color: var(--green); }
+.badge.negative { background: rgba(239,68,68,0.15); color: var(--red); }
+.badge.neutral { background: rgba(234,179,8,0.15); color: var(--yellow); }
+.section { margin-bottom: 1.5rem; }
+.section-title {
+  font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.tag { font-size: 0.7rem; padding: 0.1em 0.4em; border-radius: 4px; background: var(--accent); color: #fff; }
+.comparison-note {
+  font-size: 0.8rem; color: var(--muted); padding: 1rem;
+  background: rgba(99,102,241,0.08); border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0; margin-bottom: 1.5rem;
+}
+/* Filter controls */
+.filters {
+  display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center;
+}
+.filters select, .filters input {
+  padding: 0.4rem 0.75rem; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--card); color: var(--text);
+  font-size: 0.85rem;
+}
+.filters label { font-size: 0.8rem; color: var(--muted); }
+.filter-group { display: flex; align-items: center; gap: 0.5rem; }
+.filter-count { font-size: 0.8rem; color: var(--accent); margin-left: 0.5rem; }
+/* Star rating chart */
+.star-chart { display: flex; align-items: center; gap: 1rem; }
+.star-bar { height: 30px; border-radius: 4px; min-width: 20px; }
+.star-label { width: 120px; font-size: 0.85rem; }
+.star-value { width: 80px; text-align: right; font-size: 0.85rem; font-weight: 600; }
+.star-pct { width: 60px; text-align: right; font-size: 0.85rem; color: var(--muted); }
+.correct-row { background: rgba(34,197,94,0.05); }
+.error-row { background: rgba(239,68,68,0.05); }
+</style>
+</head>
+<body>
+<h1>Sentiment & Emotion Classification Dashboard</h1>
+<p class="subtitle">Amazon Gift Card Reviews — MBAX 6418 Assignment 1 • LLM-powered (Qwen3.6-35B-A3B) + NRC Lexicon • 152,410 reviews available, 100 imbalanced + 150 balanced sample analyzed</p>
+
+<!-- Step 2: Headline Metrics -->
+<div class="section">
+  <div class="section-title">Step 2 — First 100 Reviews <span class="tag">IMBALANCED</span></div>
+  <div class="grid grid-4" id="metrics-step2"></div>
+</div>
+
+<!-- Step 2: Accuracy Breakdown -->
+<div class="section">
+  <div class="section-title">Per-Class Accuracy (Step 2)</div>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>2-Class Confusion Matrix</h3>
+      <div id="confusion-table"></div>
+    </div>
+    <div class="card">
+      <h3>Accuracy by Sentiment</h3>
+      <div class="chart-container"><canvas id="accuracy-bar"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 2: Error Clustering -->
+<div class="section">
+  <div class="section-title">Error Clustering (Step 2)</div>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Error Types</h3>
+      <div class="chart-container"><canvas id="error-pie"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Star Rating Distribution (Full Dataset)</h3>
+      <div class="chart-container"><canvas id="star-bar-chart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Star Rating vs Sentiment -->
+<div class="section">
+  <div class="section-title">Star Rating vs Predicted Sentiment</div>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Full Dataset Star Ratings</h3>
+      <div class="chart-container"><canvas id="star-histogram"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Predicted Sentiment by Star Rating</h3>
+      <div class="chart-container"><canvas id="sentiment-stars"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 6: 3-Class Results -->
+<div class="section">
+  <div class="section-title">Step 6 — 3-Class Classification <span class="tag">BALANCED SAMPLE</span></div>
+  <div class="grid grid-4" id="metrics-step6"></div>
+  <div class="grid grid-3" style="margin-top:1.25rem">
+    <div class="card">
+      <h3>Per-Class Accuracy</h3>
+      <div class="chart-container"><canvas id="accuracy3-bar"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Predicted Sentiment Distribution</h3>
+      <div class="chart-container"><canvas id="sentiment-pie"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>True Sentiment Distribution</h3>
+      <div class="chart-container"><canvas id="sentiment-pie-true"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 6: Error Clustering -->
+<div class="section">
+  <div class="section-title">Error Clustering (Step 6)</div>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>3-Class Error Types</h3>
+      <div class="chart-container"><canvas id="error3-pie"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>3-Class Confusion Matrix</h3>
+      <div id="confusion3-table"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 5: Emotion Detection -->
+<div class="section">
+  <div class="section-title">Step 5 — Emotion Detection <span class="tag">BALANCED SAMPLE</span></div>
+  <div class="comparison-note">
+    Two methods used: <strong>LLM-based</strong> (Qwen3.6 via OpenAI-compatible endpoint) and <strong>NRC Word-Emotion Lexicon</strong> (word-list matching). Agreement is 10%, reflecting divergent approaches: lexicon is biased toward high-frequency words like "anticipation", while the LLM is context-aware but clusters around "anger" and "joy".
+  </div>
+  <div class="grid grid-4" id="metrics-emotions"></div>
+  <div class="grid grid-3" style="margin-top:1.25rem">
+    <div class="card">
+      <h3>LLM Emotion Distribution</h3>
+      <div class="chart-container"><canvas id="emotion-llm-bar"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>NRC Emotion Distribution</h3>
+      <div class="chart-container"><canvas id="emotion-nrc-bar"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Emotion Distribution by True Sentiment</h3>
+      <div class="chart-container"><canvas id="emotion-by-sentiment"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 4: Interactive Per-Review Detail -->
+<div class="section">
+  <div class="section-title">Step 4 — Per-Review Detail <span class="tag">INTERACTIVE FILTERING</span></div>
+  <div class="card">
+    <div class="filters">
+      <div class="filter-group">
+        <label>Sentiment:</label>
+        <select id="filter-sentiment">
+          <option value="all">All</option>
+          <option value="POSITIVE">POSITIVE</option>
+          <option value="NEGATIVE">NEGATIVE</option>
+          <option value="NEUTRAL">NEUTRAL</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Correctness:</label>
+        <select id="filter-correctness">
+          <option value="all">All</option>
+          <option value="correct">Correct Only</option>
+          <option value="error">Errors Only</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>LLM Emotion:</label>
+        <select id="filter-emotion">
+          <option value="all">All</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Rating:</label>
+        <select id="filter-rating">
+          <option value="all">All</option>
+          <option value="5">5 stars</option>
+          <option value="4">4 stars</option>
+          <option value="3">3 stars</option>
+          <option value="2">2 stars</option>
+          <option value="1">1 star</option>
+        </select>
+      </div>
+      <span class="filter-count" id="filter-count">0 rows</span>
+    </div>
+    <div class="chart-container" style="height:500px; overflow-y:auto;" id="detail-table-container"></div>
+  </div>
+</div>
+
+<script>
+const DATA = JSON.parse("{%22step2%22:{%22total%22:100,%22accuracy%22:83.0,%22tp%22:77,%22tn%22:6,%22fp%22:1,%22fn%22:16,%22pos_total%22:93,%22neg_total%22:7,%22pos_correct%22:77,%22neg_correct%22:6},%22step6%22:{%22total%22:150,%22accuracy%22:69.3,%22tp%22:44,%22tn%22:10,%22tf%22:50,%22pos_total%22:50,%22neg_total%22:50,%22neu_total%22:50,%22confusion%22:{%22PP%22:44,%22PN%22:3,%22PT%22:3,%22NP%22:0,%22NN%22:50,%22NT%22:0,%22TP%22:6,%22TN%22:34,%22TT%22:10},%22per_class_accuracy%22:{%22POSITIVE%22:88.0,%22NEUTRAL%22:20.0,%22NEGATIVE%22:100.0}},%22stars%22:[[%22\u2605\u2606\u2606\u2606\u2606 (1.0)%22,12326,8.087395840167968],[%22\u2605\u2605\u2606\u2606\u2606 (2.0)%22,1873,1.2289219867462766],[%22\u2605\u2605\u2605\u2606\u2606 (3.0)%22,3271,2.146184633554229],[%22\u2605\u2605\u2605\u2605\u2606 (4.0)%22,6692,4.39078800603635],[%22\u2605\u2605\u2605\u2605\u2605 (5.0)%22,128248,84.14670953349518]],%22emotion_llm%22:{%22anger%22:66,%22anticipation%22:1,%22disgust%22:10,%22fear%22:2,%22joy%22:50,%22sadness%22:8,%22surprise%22:3,%22trust%22:10},%22emotion_nrc%22:{%22anger%22:13,%22anticipation%22:79,%22disgust%22:0,%22fear%22:3,%22joy%22:12,%22sadness%22:4,%22surprise%22:2,%22trust%22:7},%22emotion_agreement%22:{%22agree%22:15,%22total%22:150,%22pct%22:10.0},%22emotion_by_sentiment%22:{%22POSITIVE%22:{%22anger%22:0,%22joy%22:45,%22sadness%22:0,%22trust%22:4,%22disgust%22:1,%22surprise%22:0,%22fear%22:0,%22anticipation%22:0},%22NEGATIVE%22:{%22anger%22:40,%22joy%22:1,%22sadness%22:2,%22trust%22:1,%22disgust%22:5,%22surprise%22:1,%22fear%22:0,%22anticipation%22:0},%22NEUTRAL%22:{%22anger%22:26,%22joy%22:4,%22sadness%22:6,%22trust%22:5,%22disgust%22:4,%22surprise%22:2,%22fear%22:2,%22anticipation%22:1}},%22review_rows%22:[{%22index%22:0,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEUTRAL%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22trust%22,%22emotions_agree%22:false,%22title%22:%22Not what I thought it could be used for%22,%22text%22:%22I can't really complain but I originally got a pre-paid visa card and wanted to use Amazon pay to buy something outside of Amazon. The merchant used Amazon pay but you I guess its just the credit card and not the gift cards so  I wasn't able to use it that way but I was able to add the card to my Amazon account and used it to buy something on Amazon so it wasn't a total loss. Annoyed me when it first happens but not enough to stop me from using Amazon again.%22},{%22index%22:1,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22sadness%22,%22emotions_agree%22:false,%22title%22:%22Unable to use missing pin, don\u2019t buy!!!%22,%22text%22:%22Scam%22},{%22index%22:2,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22No s\u00e9 puede canjear%22,%22text%22:%22No s\u00e9 puede canjear, deberia haber una restricci\u00f3n para mostrar los productos v\u00e1lidos para el pa\u00eds en que vivimos%22},{%22index%22:3,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Best gift to give any occasion%22,%22text%22:%22Everyone needs to stock up on these gift cards! Best gift to give any occasion!%22},{%22index%22:4,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22$0 balance when I received the card%22,%22text%22:%22I need the contact information as the gift card was already scratched off with a $0 balance when I received it in the mail. The gift card itself was dirty and clearly used with a tear.%22},{%22index%22:5,%22rating%22:2.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Doesn\u2019t work everywhere visa is accepted%22,%22text%22:%22I bought this in advance to budget for vacation. When places would accept it, it worked great. The first restaurant took it, no problems, gas station took it but a different restaurant and one store wouldn\u2019t accept it. It says you can use it anywhere visa is accepted but I didn\u2019t find that to be true.%22},{%22index%22:6,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22Fun%22},{%22index%22:7,%22rating%22:2.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Approved%22,%22text%22:%22I've been waiting for over an hour for approval.%22},{%22index%22:8,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Not activated%22,%22text%22:%22Just went to try it & it's not activated, no one will help%22},{%22index%22:9,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22joy%22,%22emotions_agree%22:true,%22title%22:%22Love the tin box%22,%22text%22:%22Great gift%22},{%22index%22:10,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22No message on the card%22,%22text%22:%22The card arrived as scheduled, but totally blank, without the message I entered online or my name.  The recipient has been calling family and friends trying to find out who sent him the card.  Very frustrating for him, and embarrassing for me.  I will not order another gift card from Amazon.%22},{%22index%22:11,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22sadness%22,%22nrc_emotion%22:%22trust%22,%22emotions_agree%22:false,%22title%22:%22Offered for prime day%22,%22text%22:%22I was so excited that this was offered for the prime day a reload you were to get a $10 credit. I took advantage and decided to do the reload, and never received my credit. Disappointed, to say the least.%22},{%22index%22:12,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22trust%22,%22nrc_emotion%22:%22sadness%22,%22emotions_agree%22:false,%22title%22:%22This product came in a box that was half-opened. ...%22,%22text%22:%22This product came in a box that was half-opened. I am not sure how the card didn't fall out of the package en route.%22},{%22index%22:13,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Not Worth it%22,%22text%22:%22Waste of time%22},{%22index%22:14,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22this is a good way to pay.%22,%22text%22:%22can reward 10%25, when reload 100. very good.%22},{%22index%22:15,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22disgust%22,%22nrc_emotion%22:%22joy%22,%22emotions_agree%22:false,%22title%22:%22The gift box was actually dirty%22,%22text%22:%22The gift box was actually dirty.  I was able to clean it up with Windex - but that should not have happened.%22},{%22index%22:16,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22was a great deal thank you%22},{%22index%22:17,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anger%22,%22emotions_agree%22:true,%22title%22:%22One Star%22,%22text%22:%22Box arrived ruined.%22},{%22index%22:18,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anger%22,%22emotions_agree%22:false,%22title%22:%22Love this bear%22,%22text%22:%22Love this bear. It's cute and well made! I'm probably going to buy it next year if there is a new design.%22},{%22index%22:19,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:false,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22It is easy and fast for some late shoppers and can make online shopping way easier.%22,%22text%22:%22I love it because it is easy to use on a daily basis. What I don\u2019t like is I wish every product had to have a video of the product that they are trying to sell, other wise this is an amazing online shopping source for everybody.%22},{%22index%22:20,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22sadness%22,%22emotions_agree%22:false,%22title%22:%22Three Stars%22,%22text%22:%22Very late%22},{%22index%22:21,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22NEUTRAL%22,%22correct%22:false,%22llm_emotion%22:%22disgust%22,%22nrc_emotion%22:%22anger%22,%22emotions_agree%22:false,%22title%22:%22A gift card. There's not much to say.%22,%22text%22:%22It was brand new and arrived quickly. I just wish the packaging had been smaller, because this is incredibly wasteful.%22},{%22index%22:22,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Quick and easy to use%22,%22text%22:%22Always ready to use Amazon reload. Usually processes within 1 minute%22},{%22index%22:23,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22sadness%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Gift Cards%22,%22text%22:%22The Amazon gift-money card  was suppose to have a gift card attached with my text, but the card had to be obtained from an  app. Needless to say, I was disappointed.%22},{%22index%22:24,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Gift card%22,%22text%22:%22Cute gift to the people who are gard to buy for%22},{%22index%22:25,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Reload%22,%22text%22:%22How simple it was to reload the card.%22},{%22index%22:26,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22They won\u2019t take the card in the theater so the only way to use it is to pay that stupid fee! Waste of money%22,%22text%22:%22These things are awful. They rip you off by charging you a 3 dollar \u201cconvenience fee\u201d on top of the original price of the movie tickets. Since I\u2019m a student I get a student discount on tickets at a theater near my collage. As a result my wife and I can get once set of tickets with the gift card but if we try and use the gift card with the student discount a second time it is more expensive to use the last two dollars on the gift card with the $3 fee then it is to just go into the theater and purchase tickets straight from them and throw the card away! They won\u2019t take the card in the theater so the only way to use it is to pay that stupid fee! Waste of money. Just give your friends cash in an envelope with a label that says movie gift card. Stupid rip off fandango.%22},{%22index%22:27,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Normally a great gift%22,%22text%22:%22I would normally have loved the gift cards but there was an issue with delivery and then crediting my account.  It eventually worked itself out but I still had to find new gifts to reissue after the holidays were already over.%22},{%22index%22:28,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22disgust%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22not my type of book%22,%22text%22:%22Didn't finish it. Not my cup of tea. Characters were weak%22},{%22index%22:29,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Great gift card%22,%22text%22:%22awesome amazon gift card which was easy to add to my account%22},{%22index%22:30,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22trust%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22great%22},{%22index%22:31,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22NEUTRAL%22,%22correct%22:false,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22card%22,%22text%22:%22it was a gift%22},{%22index%22:32,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22trust%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Easy to use%22,%22text%22:%22Fast, only took a minute%22},{%22index%22:33,%22rating%22:2.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22disgust%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Gift box was cheaply made%22,%22text%22:%22Box was ripped at two corners and I made the card for $35 and came as $25. (I was charged $25)<br />Kinda disappointed. It was a gift and look ugly.%22},{%22index%22:34,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22Perfect for Xmas gifts for teachers. Arrived same day which was really convenient.%22},{%22index%22:35,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Worked well!%22,%22text%22:%22It was a smooth upload to my Amazon balance and was available pretty much immediately.%22},{%22index%22:36,%22rating%22:2.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22$3/&45.00 3 $15.00 cards for $30.00%22,%22text%22:%22Why does it show 3$15.00 cards for $30.00 but when I checked out it said 3 for $30.00 yet the cards say $15.00 x 3 ==45.00  all day long%22},{%22index%22:37,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Forever 21 Gift Card%22,%22text%22:%22Exactly what I wanted to get for my sister for her birthday. She will be thrilled!%22},{%22index%22:38,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22joy%22,%22emotions_agree%22:true,%22title%22:%22worked good%22,%22text%22:%22worked good. really helpful for birthdays%22},{%22index%22:39,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22joy%22,%22emotions_agree%22:true,%22title%22:%22so it was nice to save%22,%22text%22:%22I got this card in a promotion, so it was nice to save.  Thank you Amazon!!%22},{%22index%22:40,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22The gift card is great but now there's just too many snowflakes%22,%22text%22:%22The gift card is great but now there's just too many snowflakes... Should have picked up Santa with the Ho! Ho! Ho!%22},{%22index%22:41,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22SCAM%22,%22text%22:%22DO NOT PURCHASE THIS CARD, IT IS A SCAM AND THE MONEY WILL BE USED AS SOON AS YOU ACTIVATE IT. AMAZON CAN'T DO ANYTHING ABOUT IT BUT AFTER I HAD ISSUES, I STARTED READING THE RECENT COMMENTS AND SEE I AM NOT ALONE. DO NOT PURCHASE THIS CARD AND INSTEAD TAKE THE TIME TO GET ONE IN PERSON OR YOU'LL BE OUT $200 LIKE I AM.%22},{%22index%22:42,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anger%22,%22emotions_agree%22:true,%22title%22:%22Needs fixing%22,%22text%22:%22They look all the same. Couldn't  tell how much each card was. No money amount on it.  Better off buying  cards in stores%22},{%22index%22:43,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22disgust%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Paper card, damaged, not fit to give as a gift!%22,%22text%22:%22The gift card I received is made of basically lightweight cardboard. Both the card and the envelope were shipped in a box but were bent and creased, almost as though they'd been folded in half. I know it spends the same but, as a gift, it looks awful!%22},{%22index%22:44,%22rating%22:4.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22trust%22,%22nrc_emotion%22:%22fear%22,%22emotions_agree%22:false,%22title%22:%22Four Stars%22,%22text%22:%22Simple updateing procedure.%22},{%22index%22:45,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEUTRAL%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Three Stars%22,%22text%22:%22It's a gift card in a nice tin box.%22},{%22index%22:46,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEUTRAL%22,%22correct%22:true,%22llm_emotion%22:%22trust%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22It's a gift card....%22,%22text%22:%22I mean, it literally is just a gift card. What more do you expect? Why are you still reading this? If you want to give someone an Amazon gift card, then this is an option.%22},{%22index%22:47,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22goode seller%22,%22text%22:%22good product%22},{%22index%22:48,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:false,%22llm_emotion%22:%22trust%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22One didn\u2019t work%22,%22text%22:%22Bought 2 card a for family members.  One didn\u2019t work. But it was easy to get a refund and when I ordered a replacement, it worked fine.%22},{%22index%22:49,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22Great to give out to co-workers as a &#34;thank you&#34;!%22},{%22index%22:50,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22surprise%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22I don't remember this.%22,%22text%22:%22???  I don't have an Amazon Gift Card.  Please explain.  I don't remember this.%22},{%22index%22:51,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22So cute and I didn't have to pay for the tin!%22},{%22index%22:52,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22the process went very well and I have been using my card since then.%22},{%22index%22:53,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22sadness%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Card is not delivered in cupcake tin.%22,%22text%22:%22The cupcake birthday tin with amazon gift card was supposed to arrive for my grandsons birthday. The Amazon gift card arrived separately and a week before the cupcake tin. The tin was delivered empty, pretty disappointing for a birthday gift.%22},{%22index%22:54,%22rating%22:2.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22disgust%22,%22nrc_emotion%22:%22anger%22,%22emotions_agree%22:false,%22title%22:%22Two Stars%22,%22text%22:%22The quality of the bear isn't great. The nose is so crooked!%22},{%22index%22:55,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anger%22,%22emotions_agree%22:true,%22title%22:%22This card is a scam%22,%22text%22:%22Can't find previous review I wrote...<br />Card info was stolen and used fraudulently. Money lost and nobody willing to help<br />This card is a joke.<br />KEEP AWAY%22},{%22index%22:56,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anger%22,%22emotions_agree%22:true,%22title%22:%22Reload? Nope, doesn't work.%22,%22text%22:%22Your reload system used to be foolproof.  Now it's pure garbage.<br />And it's something your staff cannot help us with. I imagine you are losing sales because of this. Too bad.%22},{%22index%22:57,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEUTRAL%22,%22correct%22:true,%22llm_emotion%22:%22disgust%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Ok%22,%22text%22:%22Got it next day, but it was dog eared.%22},{%22index%22:58,%22rating%22:2.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Two Stars%22,%22text%22:%22The dollar amounts are not printed on the gift card!%22},{%22index%22:59,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22need better packaging for shipping%22,%22text%22:%22Package came damaged. Santa tin was bent/crushed.  I hope the gift card still works.%22},{%22index%22:60,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Good quality gift box%22,%22text%22:%22Really liked the box. It\u2019s pretty and well made. With it.%22},{%22index%22:61,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22Great gift idea%22},{%22index%22:62,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Item not received%22,%22text%22:%22I did not receive the gift card and I need to know who to contact%22},{%22index%22:63,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22trust%22,%22emotions_agree%22:false,%22title%22:%22Word of Caution...%22,%22text%22:%22Works great just like any other gift card. One thing though that is important: THIS MUST BE PRINTED OUT TO BE USED. Cracker Barrel does not accept digital barcodes. My friend and I found this out the hard way.%22},{%22index%22:64,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Such a waste of time%22,%22text%22:%22I ordered this gift card weeks prior to Father's day (May) and it arrived EMPTY...no gift card in sight a week ago (end of July).  I'd already called and cancelled the card since it was way too late to give to my step-father (I opted for a Home Depot card online) and I did receive a refund from Amazon when I contacted them to complain that the card was late however, if I had not cancelled, the package arrives months later and then is empty?  VERY ANNOYING and will never order a 'physical' gift card from Amazon again.  I am aware of the electronic gift cards Amazon offers however, I did not think my step dad would understand how that worked...I learned later that he is tech  savvy and has no problem using e-gift cards (thankfully!).  Point being, it took forever to receive and then the card was missing.%22},{%22index%22:65,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22charged me 110 cents and knocked off my 50 dollar balance%22,%22text%22:%22had a perfect balance and it charged me 10 cents to reload so then I coulden't reload the card in which i had to change it to a odd number.%22},{%22index%22:66,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Convenient%22,%22text%22:%22Convenient%22},{%22index%22:67,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22One Star%22,%22text%22:%22ended up being ripped off.  this cost me $300 - However, it was not Amazon's fault.  I was scammed by a 3rd party. Just beware...%22},{%22index%22:68,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22trust%22,%22emotions_agree%22:false,%22title%22:%22The box is cute & as pictured, but it's ...%22,%22text%22:%22The box is cute & as pictured, but it's been a headache to get a functional $50 gift card.<br /><br />The there was some sort of system error with the claim code on the first gift card I was sent so it didn't register as a valid code, which to their credit they quickly realized and sent a replacement, which arrived on the same day. But the replacement showed a balance of $0 when I checked online. The person I spoke with in chat said they put a credit on the card, and it could take up to an hour to appear. I said I'd check the next day, and she said that wasn't necessary and the gift recipient should call if there was a problem. But I didn't want to make the person I'm trying to give a gift deal with customer service so I called when it still showed a $0 balance the next day. The person on the phone quickly put the credit on the account, and I had to explain that since I had purchased this gift I didn't want the balance on my account, but on the card. She put me on hold to figure out how to reverse the credit to my account & the call hung up after I was on hold for a few minutes so I called again & was put on hold again. She tried to tell me that the balance had been claimed before I'd even received the replacement card. Then she told me it would take 1-2 business days for the $50 credit the other person from the call center had applied to my account to show on my card & I would have to wait for that to happen before the balance could be moved to the gift recipient.%22},{%22index%22:69,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22fear%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Gift card tin arrived damaged!%22,%22text%22:%22Ordered 6 gift cards total.  All of them came in plastic wrap except this one.  The tin was scratched and appeared to be used.  I\u2019m hoping the gift card itself is good and not tampered with.  I\u2019ve never had any problems before.%22},{%22index%22:70,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22joy%22,%22emotions_agree%22:false,%22title%22:%22Gift cards%22,%22text%22:%22I don't know what has happened to Amazon. The reason we pay for Prime is bc we love we shipping and 2 day shipping. I guess they forgot that. It tooked me 10 days to get these gift certificates. Something they should have on hand. I'm also finding that I have to pay shipping cost on many items and waiting almost 2 weeks to get. Amazon. This is what set you apart. Your about to lose your niche.%22},{%22index%22:71,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Not once did I ever get the extra 10 dollars%22,%22text%22:%22Iset up the auto payment over and over several times and not once did I get the extra 10 dollars%22},{%22index%22:72,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22HORRIBLE%22,%22text%22:%22i purchased a 50 dollar gift card for my grandson for xmas, he made a 13 dollar purchase and a couple days later he went to use it and couldn't it said it was already claimed so i contacted amazon thru chat and they said they corrected it, but he went to use it and it wasnt fixed...i contacted amazon again thru chat and they told me \%22 no worries we will check into this and get back to you, we have to check more thoroughly into this\%22...its been 72 hours and still havent heard back, thats why a bad review..My grandson got only a 13 dollar gift card even though i paid 50 ...i will NEVER again buy a gift card from Amazon!!!!%22},{%22index%22:73,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Convinent and good last minute gift%22,%22text%22:%22Get this if you forget events and have a wife%22},{%22index%22:74,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEUTRAL%22,%22correct%22:true,%22llm_emotion%22:%22trust%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Three Stars%22,%22text%22:%22gift%22},{%22index%22:75,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Nope%22,%22text%22:%22Doesn't reload easy from other cards%22},{%22index%22:76,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anger%22,%22emotions_agree%22:true,%22title%22:%22Very annoying that there is no denomination anywhere on the box%22,%22text%22:%22Very annoying that there is no denomination anywhere on the box, card, or plastic it comes in. I ordered various gift cards and have no idea how much any of them are worth. I have to remove each claim code from the cards. Tacky!%22},{%22index%22:77,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Quick'n easy.%22,%22text%22:%22Had to get a last minute gift for someone I didn't really know much about. Ordered and had it delivered straight to my door the day after purchasing. Needless to say, they loved it - and I didn't have to worry about buying a &#34;wrong&#34; gift.%22},{%22index%22:78,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22sadness%22,%22emotions_agree%22:false,%22title%22:%22Too late%22,%22text%22:%22This showed up 2 days late and had to run out and buy a replacement gift on the party day.  Not cool.%22},{%22index%22:79,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEUTRAL%22,%22correct%22:true,%22llm_emotion%22:%22sadness%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Three Stars%22,%22text%22:%22Ok%22},{%22index%22:80,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Otherwise it's nice and convenient to use%22,%22text%22:%22I never got the $5 that was advertised for loading $100 on my card though.  Otherwise it's nice and convenient to use.%22},{%22index%22:81,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anger%22,%22emotions_agree%22:true,%22title%22:%22DONT BUY! Packaged in envelope=smashed%22,%22text%22:%22Cute card and box, but the box was smashed. It was packaged in an envelope, which gets fed through machines at post office. Should\u2019ve been packaged in a box to prevent damage. Just get an e-gift card or pick one up from a local store instead.%22},{%22index%22:82,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22... dad loves to eat at rubios so these make good easy gifts%22,%22text%22:%22My dad loves to eat at rubios so these make good easy gifts.%22},{%22index%22:83,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22frustration with adding balance to Gift Card.%22,%22text%22:%22The entire situation is very frustrating and no seems to be able to give me an answer  The three representatives I spoke with yesterday were very nice, but could not figure out why I can add $100 to my gift card balance, but when I try to add $50, it is declined ever time.  Why must I to my gift card balance in $100 increments and cannot add in $50 increments?%22},{%22index%22:84,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22card shows zero balance and no money back!!!%22,%22text%22:%22Bought it last November and kept it safely in my draw. I tried to use it in my local raley's store recently and it was denied. Called the number at the back side of the gift card and found it was already used at a location where I have never heard of. $100 balance was gone in one transaction. Be aware of this gift card fraud. If you buy it, use it ASAP. Otherwise, you won't get your money back even you kept the card in a safe place, someone can still find a way of duplicate your card and use all of your balance.%22},{%22index%22:85,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22What else is there to say?%22,%22text%22:%22easy way to reload balance when there are discounts%22},{%22index%22:86,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Should be discounted%22,%22text%22:%22Should get one free for every $1000 you spend on Amazon%22},{%22index%22:87,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22This Gift Card was not received%22,%22text%22:%22Beware - Sure - it is very easy to acquire but was bought for a Nephew's wedding  through his Registry and it did not get delivered as stated.  Now I have to figure out where to report this and how to contact Amazon - which is not really giving very accessible direction so I am writing this review to warn others.  Stated it was delivered to my Nephew at a \%22Confidential\%22 address in the city his parents live in - sounds good, right?.  Out $100.00- Sending him a check!  Don't want to give any stars but wanted this review to be seen.%22},{%22index%22:88,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22fear%22,%22emotions_agree%22:false,%22title%22:%22Do not purchase%22,%22text%22:%22This card does not work in many places\u2026 save yourself the embarrassment of card being declined\u2026. Do not purchase this prepaid card%22},{%22index%22:89,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22An Easy Gift Option, but...%22,%22text%22:%22The one I ordered had the box arrive dented which took away from the quality look of the gift. A simple issue, but one that did detract from the gift presentation.%22},{%22index%22:90,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Easy Giftcard to use, but... value was not indicated.%22,%22text%22:%22Gift card is use as intended but the value I bought was $20, in the card, I got 17.94 instead.  Too much of a hassle to report for $2.06.  Those whom buy gift cards, please check value of it.  I didn't check the value until using the gift card which was out of the return window.%22},{%22index%22:91,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Nice . Easy to carry. Good looking%22,%22text%22:%22Good product%22},{%22index%22:92,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22NEUTRAL%22,%22correct%22:false,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Gift card%22,%22text%22:%22For to destination quick%22},{%22index%22:93,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22joy%22,%22emotions_agree%22:false,%22title%22:%22Not suitable for gifting.  No way to replace, if gift box damaged.%22,%22text%22:%22Purchased as a all-in-one baby gift.  The box was delivered damaged and not suitable for gifting.  Since there is a gift card, not eligible for RETURN.  Cannot find way to request a replacement.  Every link loops back to same \%22no refund\%22 message.  Very disappointed!%22},{%22index%22:94,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Did Not Work%22,%22text%22:%22When the cards were tried to be used on Amazon it said they are inactive and I called Customer Service and they could not figure it out and told me someone would call me and noone ever did and it has been almost a week%22},{%22index%22:95,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22trust%22,%22emotions_agree%22:false,%22title%22:%22amazon gift card%22,%22text%22:%22It was difficult to figure out how to use the card with the Kindle. It would be great if there were an obvious option in the kindle itself to upload the card. I had to do it logging into my amazon.com account online with my computer.%22},{%22index%22:96,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22surprise%22,%22emotions_agree%22:false,%22title%22:%22I ordered 2 gift cards , value $ 50 each , each with a card. Don't know how this order get transformed into one gift card%22,%22text%22:%22ordered 2 gift cards , value $ 50 each , each with a card. Don't know how this order get transformed into one gift card  with combined value of $100 and one card. Beside of this I was offered to write a message, assume it will be on a card. However, the message was on separate slip of paper, what I'm supposed to do with it ?<br /><br />Maya Isayev%22},{%22index%22:97,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:false,%22llm_emotion%22:%22surprise%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22really?%22,%22text%22:%22you want me to review a gift card? it's money. it's good.%22},{%22index%22:98,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22sadness%22,%22nrc_emotion%22:%22anger%22,%22emotions_agree%22:false,%22title%22:%22Cute, if you want a pirate pinata%22,%22text%22:%22Cute idea. I wish it would've been packaged a little more carefully rather than being thrown in with other ordered items - it needs its been little box. Arrived with bent ears and one of the eyes was missing.%22},{%22index%22:99,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22fun%22},{%22index%22:100,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Really cute gift card bag%22,%22text%22:%22Really cute gift card bag! It's right on target and colors are gender neutral%22},{%22index%22:101,%22rating%22:2.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22sadness%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22.%22,%22text%22:%22I didn\u2019t really know what I am doing%22},{%22index%22:102,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEUTRAL%22,%22correct%22:true,%22llm_emotion%22:%22trust%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22a little confusing to add%22,%22text%22:%22ok process%22},{%22index%22:103,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anger%22,%22emotions_agree%22:true,%22title%22:%22Cash back not implemented%22,%22text%22:%22I executed a purchase after the gift card was activated, but still withdrew money from credit card. I was supposed to see a 5%25 cash back which I'll loose...%22},{%22index%22:104,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22One Star%22,%22text%22:%22Waste of money, there are loaders that will give more, $100 for 45 minutes of entertainment, crazy, never good%22},{%22index%22:105,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:false,%22llm_emotion%22:%22disgust%22,%22nrc_emotion%22:%22trust%22,%22emotions_agree%22:false,%22title%22:%22Bezos Bank Card%22,%22text%22:%22Sort like having money in a bank and getting no interest on it,<br />in fact it is bank in which you can only buy Amazon stuff but . . .<br /><br />'You can get anything you want at Amazon's restaurant<br />Walk right in, it's around the back<br />Just a half a mile from the railroad track<br />You can get anything you want at Amazon's restaurant.<br /><br />  . . .  with thanks to Arlo Guthrie 1976%22},{%22index%22:106,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22trust%22,%22emotions_agree%22:false,%22title%22:%22Watch what it's used for%22,%22text%22:%22These cards were used to scam money from my Credit Union Account!%22},{%22index%22:107,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Nice%22,%22text%22:%22Very easy to use and practical.%22},{%22index%22:108,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22I like it%22},{%22index%22:109,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anticipation%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:true,%22title%22:%22Inadequate information on bonus offer, hard to find info on website%22,%22text%22:%22Inadequate information on bonus offer, hard to find info on website, I use Amazon often and just think they need to address these issues for future patrons%22},{%22index%22:110,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22WARNING!!! THIS IS NOT THE SAME AS FANDANGONOW%22,%22text%22:%22I thought that this was the same as a FandangoNow gift card so I could make some purchases on the Vudu service, but it is not the same thing and they do not make that clear enough on the purchasing page that this is so.  I get why they do it because they want to trick people like me thinking that they are the same while they get my money and I get a gift card that is useless for my purposes.%22},{%22index%22:111,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22The down side to these cards%22,%22text%22:%22The cards can go up to 250.00, but you can only buy in $50.00 increments. I wanted $100.00, had to get 2 cards, and they shipped separately too%22},{%22index%22:112,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22surprise%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22... come with a tassel on the graduation cap box like in the picture%22,%22text%22:%22Little confused why it didnt come with a tassel on the graduation cap box like in the picture. Looks a lil dumb without it. Other than that gift card is fine.%22},{%22index%22:113,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22trust%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22You can't go wrong with a gift card%22},{%22index%22:114,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEUTRAL%22,%22correct%22:true,%22llm_emotion%22:%22sadness%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Three Stars%22,%22text%22:%22fdfsdgs%22},{%22index%22:115,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22joy%22,%22emotions_agree%22:false,%22title%22:%22Better than nothing%22,%22text%22:%222%25 back when Apple Pay boasts 6%25 is hardly worth jumping to joy over. It wouldn\u2019t be so bad if it was more than just a promotional credit that a lot of things don\u2019t qualify for.%22},{%22index%22:116,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Someone didn't care%22,%22text%22:%22The card and snowflake holder were intact but the gift note inside was crumpled.  What a way to present a gift!%22},{%22index%22:117,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22My granddaughter loves it%22},{%22index%22:118,%22rating%22:2.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22surprise%22,%22emotions_agree%22:false,%22title%22:%22Email Option%22,%22text%22:%22Wanted to send by email, couldn't find it like in the past.  So guess I will have to call her on Mother's Day and give her the redemption code.  Although by one of your feed backs, it's paper & trying to get it ruins the number.  What to do?%22},{%22index%22:119,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22joy%22,%22emotions_agree%22:false,%22title%22:%22Not as pictured.%22,%22text%22:%22The cards that I received are not as pictured.  They are plain and don't look authentic.%22},{%22index%22:120,%22rating%22:4.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Nice gift for teen agers that you don't know what ...%22,%22text%22:%22Nice gift for teen agers that you don't know what to get them.  Handy since you can just order them instead of stopping some where.%22},{%22index%22:121,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Sucks 0 stars if I could%22,%22text%22:%22Stuck and it sucks worst ever!%22},{%22index%22:122,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22joy%22,%22emotions_agree%22:false,%22title%22:%22Major disappointment%22,%22text%22:%22Cannot be used for AMAZON MUSIC UNLIMITED....AMAZON REFUSES TO REFUND EVEN THOUGH IT SAYS GOOD FOR DIGITAL GOODS AND PRODUCTS FROM AMAZON.COM%22},{%22index%22:123,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Gift cards work.%22,%22text%22:%22No idea why this item requires a review.  This is what I do with prepaid visa cards that I sometimes get.  I turn them immediately into amazon credit that doesn't go away or have strange fees or something.  It's a good use.%22},{%22index%22:124,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Doesn't state the amount anywhere on the card or the box%22,%22text%22:%22The amount of the gift card should be stated on the card or box.%22},{%22index%22:125,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22timely%22},{%22index%22:126,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22***buyers beware***%22,%22text%22:%22If I could give ZERO stars, I would.  This is a scam. The gift card arrives already used.%22},{%22index%22:127,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22joy%22,%22emotions_agree%22:true,%22title%22:%22Cute and soft.%22,%22text%22:%22Got it free from the Amazon gift card purchase. My daughter loves it.%22},{%22index%22:128,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22I will never buy another Amazon store card again%22,%22text%22:%22Bought card thought it would take money out when I make a purchase each month at Amazon,  then they send me late payment. I spent over an hour on their chat line got no where. So wtf is this card good for?%22},{%22index%22:129,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22It's a good gift%22,%22text%22:%22I gift my kids with this and they enjoy shopping with it.%22},{%22index%22:130,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22disgust%22,%22nrc_emotion%22:%22fear%22,%22emotions_agree%22:false,%22title%22:%22Not really needed%22,%22text%22:%22Order by accident doesn\u2019t make sense to have for me%22},{%22index%22:131,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Easy and Usable Birthday Gift%22,%22text%22:%22This looks awesome and better gift for birthdays if you are planning to gift Gift cards as it has nice envelope and it is free .%22},{%22index%22:132,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22It's a gift card, what's there to say?%22,%22text%22:%22Delivered on schedule, cute box, highly redeemable as it is for Amazon.%22},{%22index%22:133,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Lovely gift card boxed.%22,%22text%22:%22This lovely gift box is such a nice present for Christmas or other celebrations. For men would be nice to have bolder colors.%22},{%22index%22:134,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Card will Not activate cannot talk to a Person for help. Never will buy one again!%22,%22text%22:%22Gift card WILL NOT ACTIVATE. HELP!! TRYING TO TALK TO SOMEONE IS IMPOSSIBLE%22},{%22index%22:135,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anger%22,%22emotions_agree%22:true,%22title%22:%22Arrived on day promised%22,%22text%22:%22You have the option of them printing a message of your choosing in the card.  I did choose to write a few short words and the card arrived without the inscription inside.%22},{%22index%22:136,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Please don't let her but nothing from you all.%22,%22text%22:%22I didn't order this gift card at all. I don't know this person at all. So don't send this gift card to that person at all.%22},{%22index%22:137,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22easy to use%22},{%22index%22:138,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22CUTE, BUT FORGET IT; VERY POORLY DESIGNED%22,%22text%22:%22Thought it looked so cute, BUT VERY DIFFICULT TO OPEN OR PUT Back TOGETHER again after removing gift. NOT EASY TO USE AT ALL!<br />Disappointed to give to grandson that couldn\u2019t get it back together. Cute design but needs to be REDESIGNED so it\u2019s easy to open and then put back together again. Poorly designed.%22},{%22index%22:139,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22joy%22,%22emotions_agree%22:true,%22title%22:%22Five Stars%22,%22text%22:%22excellent%22},{%22index%22:140,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEUTRAL%22,%22correct%22:true,%22llm_emotion%22:%22trust%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Three Stars%22,%22text%22:%22It's a gift card.  What do you expect?%22},{%22index%22:141,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Take one biz day to reload your balance.%22,%22text%22:%22It takes time to reload your balance, even though your order mail said \u201c Typically your balance is updated within 5 minutes of your order\u201d. I have contacted the customer service and it said that usually takes 1 business day to reload. Quite a misleading wording from the gift card section in Amazon.%22},{%22index%22:142,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22POSITIVE%22,%22correct%22:true,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Five Stars%22,%22text%22:%22good%22},{%22index%22:143,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22disgust%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Looks used%22,%22text%22:%22This is a Christmas gift, the cardboard holder is wrinkled and the card hardly sticks to it. So now I\u2019m going to have to come up with another holder because I\u2019d be too embarrassed to gift it in this condition, it\u2019s looks like someone had it the bottom of a drawer for months. Just hope it\u2019s wasn\u2019t used then returned \ud83d\ude44%22},{%22index%22:144,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22IT DOESNT APPLY THE 10.00 dlls DISCOUNT OFFER AFTER RELOADING THE CARD%22,%22text%22:%22Is definitely easy to use. However NEVER GIVES ME THE PROMISE PRICE!!!<br />Every time I\u2019m offered to reload de card and offers me the 10.00 less/discount/promo/offer from for my order n shipment orinal price,  IT DOES\u2019NT  APLIES The 10.00 less to the order.%22},{%22index%22:145,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22Just a method of payment%22,%22text%22:%22You are kidding me to ask to rate pre-paying a gift card! Right????  This is not a product or service, just a method of payment. What exactly am I to rate?%22},{%22index%22:146,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEUTRAL%22,%22correct%22:true,%22llm_emotion%22:%22sadness%22,%22nrc_emotion%22:%22joy%22,%22emotions_agree%22:false,%22title%22:%22Love the Gift Card - Hate the Dented Package%22,%22text%22:%22I was excited about giving my daughter an Amazon gift card in its own tin box. I was pleased with the service provided, however I was disappointed when I saw the tin box. It was damaged in the mail and one corner was bent out of shape. I have purchased the snowflake tin box before and used it again and have surprised people when they opened it to find an Amazon gift card inside. I will not be able to reuse the square box again due to its damage. I will continue to order gift cards in the future, but I hope not to be disappointed again. I realize this was probably not Amazon's fault, but I hope they will try to package it more securely and mark it on the envelope in the future.%22},{%22index%22:147,%22rating%22:3.0,%22true_sentiment%22:%22NEUTRAL%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22fear%22,%22nrc_emotion%22:%22anticipation%22,%22emotions_agree%22:false,%22title%22:%22The box looks fancy but the card gets stuck inside%22,%22text%22:%22I love how the box looks but the gift card was stuck inside. I had to open the entire box to get it out from inside. Thank God I checked at first. The gift recipient would've thought that I gave her an empty box lol%22},{%22index%22:148,%22rating%22:5.0,%22true_sentiment%22:%22POSITIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:false,%22llm_emotion%22:%22joy%22,%22nrc_emotion%22:%22unknown%22,%22emotions_agree%22:false,%22title%22:%22Lit%22,%22text%22:%22AmOzng%22},{%22index%22:149,%22rating%22:1.0,%22true_sentiment%22:%22NEGATIVE%22,%22predicted_sentiment%22:%22NEGATIVE%22,%22correct%22:true,%22llm_emotion%22:%22anger%22,%22nrc_emotion%22:%22anger%22,%22emotions_agree%22:true,%22title%22:%22DOESN'T WORK!%22,%22text%22:%22Mine was not even valid, no money on the card and I'm out 50 bucks!%22}]}");
+
+// Render metrics
+document.getElementById('metrics-step2').innerHTML = `
+  <div class="card"><div class="metric accent">${DATA.step2.total}</div><div class="metric-label">Reviews Classified</div></div>
+  <div class="card"><div class="metric green">${DATA.step2.accuracy}%</div><div class="metric-label">Overall Accuracy</div></div>
+  <div class="card"><div class="metric green">${DATA.step2.tp} TP</div><div class="metric-label">True Positives</div></div>
+  <div class="card"><div class="metric red">${DATA.step2.fn} FN</div><div class="metric-label">False Negatives</div></div>
+`;
+
+document.getElementById('metrics-step6').innerHTML = `
+  <div class="card"><div class="metric accent">${DATA.step6.total}</div><div class="metric-label">Balanced Reviews</div></div>
+  <div class="card"><div class="metric orange">${DATA.step6.accuracy}%</div><div class="metric-label">Overall Accuracy</div></div>
+  <div class="card"><div class="metric yellow">1:1:1</div><div class="metric-label">Sample Distribution (Balanced)</div></div>
+  <div class="card"><div class="metric red">${DATA.emotion_agreement.pct}%</div><div class="metric-label">LLM/NRC Emotion Agreement</div></div>
+`;
+
+document.getElementById('metrics-emotions').innerHTML = `
+  <div class="card"><div class="metric accent2">8</div><div class="metric-label">Emotion Categories</div></div>
+  <div class="card"><div class="metric green">joy</div><div class="metric-label">Most Common LLM Emotion</div></div>
+  <div class="card"><div class="metric orange">anticipation</div><div class="metric-label">Most Common NRC Emotion</div></div>
+  <div class="card"><div class="metric red">${DATA.emotion_agreement.pct}%</div><div class="metric-label">Cross-Method Agreement</div></div>
+`;
+
+// Confusion matrix (2-class)
+let cmHTML = '<table><tr><th>Predicted \\ True</th><th>POSITIVE</th><th>NEGATIVE</th></tr>';
+cmHTML += '<tr><td><strong>POSITIVE</strong></td><td style="color:var(--green)">' + DATA.step2.tp + '</td><td style="color:var(--red)">' + DATA.step2.fp + '</td></tr>';
+cmHTML += '<tr><td><strong>NEGATIVE</strong></td><td style="color:var(--red)">' + DATA.step2.fn + '</td><td style="color:var(--green)">' + DATA.step2.tn + '</td></tr>';
+cmHTML += '</table>';
+document.getElementById('confusion-table').innerHTML = cmHTML;
+
+// 3-class confusion matrix
+let cm3HTML = '<table><tr><th>Predicted \\ True</th><th>POSITIVE</th><th>NEGATIVE</th><th>NEUTRAL</th></tr>';
+cm3HTML += '<tr><td><strong>POSITIVE</strong></td><td>' + DATA.step6.confusion.PP + '</td><td>' + DATA.step6.confusion.PN + '</td><td>' + DATA.step6.confusion.PT + '</td></tr>';
+cm3HTML += '<tr><td><strong>NEGATIVE</strong></td><td>' + DATA.step6.confusion.NP + '</td><td>' + DATA.step6.confusion.NN + '</td><td>' + DATA.step6.confusion.NT + '</td></tr>';
+cm3HTML += '<tr><td><strong>NEUTRAL</strong></td><td>' + DATA.step6.confusion.TP + '</td><td>' + DATA.step6.confusion.TN + '</td><td>' + DATA.step6.confusion.TT + '</td></tr>';
+cm3HTML += '</table>';
+document.getElementById('confusion3-table').innerHTML = cm3HTML;
+
+// Charts
+const commonOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: '#8b8fa3', font: { size: 11 } } } }
+};
+
+// Accuracy bar (2-class)
+new Chart(document.getElementById('accuracy-bar'), {
+  type: 'bar',
+  data: {
+    labels: ['POSITIVE', 'NEGATIVE'],
+    datasets: [{
+      label: 'Per-Class Accuracy (%)',
+      data: [DATA.step2.perClassAccuracy.POSITIVE, DATA.step2.perClassAccuracy.NEGATIVE],
+      backgroundColor: ['#22c55e', '#ef4444'],
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    ...commonOptions,
+    scales: {
+      y: { max: 100, grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } },
+      x: { grid: { display: false }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// 3-class accuracy bar
+new Chart(document.getElementById('accuracy3-bar'), {
+  type: 'bar',
+  data: {
+    labels: ['POSITIVE', 'NEUTRAL', 'NEGATIVE'],
+    datasets: [{
+      label: 'Per-Class Accuracy (%)',
+      data: [DATA.step6.per_class_accuracy.POSITIVE, DATA.step6.per_class_accuracy.NEUTRAL, DATA.step6.per_class_accuracy.NEGATIVE],
+      backgroundColor: ['#22c55e', '#eab308', '#ef4444'],
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    ...commonOptions,
+    scales: {
+      y: { max: 100, grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } },
+      x: { grid: { display: false }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Sentiment pie (predicted) - should be 50:50:50 for balanced
+new Chart(document.getElementById('sentiment-pie'), {
+  type: 'doughnut',
+  data: {
+    labels: ['POSITIVE', 'NEUTRAL', 'NEGATIVE'],
+    datasets: [{
+      data: [
+        DATA.step6.confusion.PP + DATA.step6.confusion.PN + DATA.step6.confusion.PT,
+        DATA.step6.confusion.TP + DATA.step6.confusion.TN + DATA.step6.confusion.TT,
+        DATA.step6.confusion.NP + DATA.step6.confusion.NN + DATA.step6.confusion.NT
+      ],
+      backgroundColor: ['#22c55e', '#eab308', '#ef4444'],
+      borderWidth: 0,
+    }]
+  },
+  options: { ...commonOptions, cutout: '60%' }
+});
+
+// True sentiment pie
+new Chart(document.getElementById('sentiment-pie-true'), {
+  type: 'doughnut',
+  data: {
+    labels: ['POSITIVE', 'NEUTRAL', 'NEGATIVE'],
+    datasets: [{
+      data: [DATA.step6.pos_total, DATA.step6.neu_total, DATA.step6.neg_total],
+      backgroundColor: ['#22c55e', '#eab308', '#ef4444'],
+      borderWidth: 0,
+    }]
+  },
+  options: { ...commonOptions, cutout: '60%' }
+});
+
+// Error pie (Step 2)
+new Chart(document.getElementById('error-pie'), {
+  type: 'doughnut',
+  data: {
+    labels: ['False Neg (POS as NEG)', 'False Pos (NEG as POS)'],
+    datasets: [{
+      data: [DATA.step2.fn, DATA.step2.fp],
+      backgroundColor: ['#ef4444', '#f97316'],
+      borderWidth: 0,
+    }]
+  },
+  options: {
+    ...commonOptions, cutout: '60%',
+    plugins: { ...commonOptions.plugins, tooltip: { enabled: true } }
+  }
+});
+
+// 3-class error pie
+const errorLabels = ['NEUTRAL→POS', 'NEUTRAL→NEG', 'POS→NEG', 'NEG→POS', 'POS→NEUTRAL', 'NEG→NEUTRAL'];
+const errorCounts = [
+  DATA.step6.confusion.TP,
+  DATA.step6.confusion.TN,
+  DATA.step6.confusion.PN,
+  DATA.step6.confusion.NP,
+  DATA.step6.confusion.PT,
+  DATA.step6.confusion.NT
+];
+new Chart(document.getElementById('error3-pie'), {
+  type: 'doughnut',
+  data: {
+    labels: errorLabels,
+    datasets: [{
+      data: errorCounts,
+      backgroundColor: ['#eab308', '#eab308', '#ef4444', '#ef4444', '#f97316', '#f97316'],
+      borderWidth: 0,
+    }]
+  },
+  options: { ...commonOptions, cutout: '60%' }
+});
+
+// LLM emotion bar
+const llmEmotions = ['anger', 'anticipation', 'disgust', 'fear', 'joy', 'sadness', 'surprise', 'trust'];
+new Chart(document.getElementById('emotion-llm-bar'), {
+  type: 'bar',
+  data: {
+    labels: llmEmotions,
+    datasets: [{
+      label: 'Count',
+      data: llmEmotions.map(e => DATA.emotion_llm[e] || 0),
+      backgroundColor: '#6366f1',
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    ...commonOptions, indexAxis: 'y',
+    scales: {
+      x: { grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } },
+      y: { grid: { display: false }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// NRC emotion bar
+new Chart(document.getElementById('emotion-nrc-bar'), {
+  type: 'bar',
+  data: {
+    labels: llmEmotions,
+    datasets: [{
+      label: 'Count',
+      data: llmEmotions.map(e => DATA.emotion_nrc[e] || 0),
+      backgroundColor: '#22d3ee',
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    ...commonOptions, indexAxis: 'y',
+    scales: {
+      x: { grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } },
+      y: { grid: { display: false }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Emotion by sentiment (stacked bar)
+new Chart(document.getElementById('emotion-by-sentiment'), {
+  type: 'bar',
+  data: {
+    labels: ['POSITIVE', 'NEGATIVE', 'NEUTRAL'],
+    datasets: llmEmotions.map(e => ({
+      label: e,
+      data: [
+        DATA.emotion_by_sentiment.POSITIVE[e] || 0,
+        DATA.emotion_by_sentiment.NEGATIVE[e] || 0,
+        DATA.emotion_by_sentiment.NEUTRAL[e] || 0
+      ],
+      backgroundColor: {
+        anger: '#ef4444', anticipation: '#8b8fa3', disgust: '#f97316',
+        fear: '#a855f7', joy: '#22c55e', sadness: '#6366f1',
+        surprise: '#eab308', trust: '#22d3ee'
+      }[e],
+    })),
+  },
+  options: {
+    ...commonOptions,
+    scales: {
+      x: { stacked: true, grid: { display: false }, ticks: { color: '#8b8fa3' } },
+      y: { stacked: true, grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Star rating histogram (full dataset)
+new Chart(document.getElementById('star-histogram'), {
+  type: 'bar',
+  data: {
+    labels: ['1★', '2★', '3★', '4★', '5★'],
+    datasets: [{
+      label: 'Count',
+      data: DATA.stars.map(s => s[1]),
+      backgroundColor: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#22c55e'],
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    ...commonOptions,
+    scales: {
+      y: { grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } },
+      x: { grid: { display: false }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Star vs sentiment (grouped bar)
+const starData = {
+  '1': { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 },
+  '2': { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 },
+  '3': { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 },
+  '4': { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 },
+  '5': { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 },
+};
+DATA.review_rows.forEach(r => {
+  const s = r.rating.toString();
+  if (starData[s]) starData[s][r.true_sentiment]++;
+});
+new Chart(document.getElementById('sentiment-stars'), {
+  type: 'bar',
+  data: {
+    labels: ['1★', '2★', '3★', '4★', '5★'],
+    datasets: [
+      { label: 'POSITIVE', data: ['5','4','3','2','1'].map(s => starData[s].POSITIVE), backgroundColor: '#22c55e', borderRadius: 3 },
+      { label: 'NEUTRAL', data: ['5','4','3','2','1'].map(s => starData[s].NEUTRAL), backgroundColor: '#eab308', borderRadius: 3 },
+      { label: 'NEGATIVE', data: ['5','4','3','2','1'].map(s => starData[s].NEGATIVE), backgroundColor: '#ef4444', borderRadius: 3 },
+    ]
+  },
+  options: {
+    ...commonOptions,
+    scales: {
+      y: { stacked: true, grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } },
+      x: { grid: { display: false }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Filter population
+const emotionSelect = document.getElementById('filter-emotion');
+const emotions = Object.keys(DATA.emotion_llm).sort();
+emotions.forEach(e => {
+  const opt = document.createElement('option');
+  opt.value = e;
+  opt.textContent = e.charAt(0).toUpperCase() + e.slice(1);
+  emotionSelect.appendChild(opt);
+});
+
+// Render table
+function renderTable(rows) {
+  let html = '<table><thead><tr><th>#</th><th>Rating</th><th>True</th><th>Predicted</th><th>Correct</th><th>LLM Emotion</th><th>NRC Emotion</th><th>Match</th><th>Title</th></tr></thead><tbody>';
+  rows.forEach(r => {
+    const cls = r.correct ? 'correct-row' : 'error-row';
+    html += '<tr class="' + cls + '">' +
+      '<td>' + r.index + '</td>' +
+      '<td>' + r.rating.toFixed(1) + '★</td>' +
+      '<td><span class="badge ' + sentimentClass(r.true_sentiment) + '">' + r.true_sentiment + '</span></td>' +
+      '<td><span class="badge ' + sentimentClass(r.predicted_sentiment) + '">' + r.predicted_sentiment + '</span></td>' +
+      '<td>' + (r.correct ? '✓' : '✗') + '</td>' +
+      '<td>' + r.llm_emotion + '</td>' +
+      '<td>' + r.nrc_emotion + '</td>' +
+      '<td>' + (r.emotions_agree ? '✓' : '✗') + '</td>' +
+      '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + r.title.replace(/"/g, '&quot;') + '">' + r.title + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('detail-table-container').innerHTML = html;
+}
+
+function sentimentClass(s) {
+  if (s === 'POSITIVE') return 'positive';
+  if (s === 'NEGATIVE') return 'negative';
+  return 'neutral';
+}
+
+// Initial render
+renderTable(DATA.review_rows);
+
+// Filtering
+function applyFilters() {
+  const sent = document.getElementById('filter-sentiment').value;
+  const corr = document.getElementById('filter-correctness').value;
+  const emo = document.getElementById('filter-emotion').value;
+  const rat = document.getElementById('filter-rating').value;
+
+  let filtered = DATA.review_rows.filter(r => {
+    if (sent !== 'all' && r.true_sentiment !== sent) return false;
+    if (corr === 'correct' && !r.correct) return false;
+    if (corr === 'error' && r.correct) return false;
+    if (emo !== 'all' && r.llm_emotion !== emo) return false;
+    if (rat !== 'all' && r.rating.toString() !== rat) return false;
+    return true;
+  });
+
+  renderTable(filtered);
+  document.getElementById('filter-count').textContent = filtered.length + ' rows';
+}
+
+document.getElementById('filter-sentiment').addEventListener('change', applyFilters);
+document.getElementById('filter-correctness').addEventListener('change', applyFilters);
+document.getElementById('filter-emotion').addEventListener('change', applyFilters);
+document.getElementById('filter-rating').addEventListener('change', applyFilters);
+</script>
+</body>
+</html>

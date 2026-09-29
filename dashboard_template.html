@@ -1,0 +1,613 @@
+import json
+
+# Load dashboard data
+with open("/Users/iananderson/Documents/Assign1/dashboard_data.json") as f:
+    data = json.load(f)
+
+# Build the complete dashboard HTML with correct data, interactive filtering, and star rating chart
+html = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentiment & Emotion Classification Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0f1117;
+  --card: #181a24;
+  --border: #2a2d3a;
+  --text: #e2e4eb;
+  --muted: #8b8fa3;
+  --accent: #6366f1;
+  --accent2: #22d3ee;
+  --green: #22c55e;
+  --red: #ef4444;
+  --yellow: #eab308;
+  --orange: #f97316;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  padding: 2rem;
+}
+h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
+.subtitle { color: var(--muted); margin-bottom: 2rem; font-size: 0.9rem; }
+.grid { display: grid; gap: 1.25rem; }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+.card h3 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+.metric { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+.metric.green { color: var(--green); }
+.metric.red { color: var(--red); }
+.metric.accent { color: var(--accent); }
+.metric.accent2 { color: var(--accent2); }
+.metric.yellow { color: var(--yellow); }
+.metric.orange { color: var(--orange); }
+.metric-label { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+.chart-container { position: relative; height: 280px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.badge { display: inline-block; padding: 0.15em 0.5em; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
+.badge.positive { background: rgba(34,197,94,0.15); color: var(--green); }
+.badge.negative { background: rgba(239,68,68,0.15); color: var(--red); }
+.badge.neutral { background: rgba(234,179,8,0.15); color: var(--yellow); }
+.section { margin-bottom: 1.5rem; }
+.section-title {
+  font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.tag { font-size: 0.7rem; padding: 0.1em 0.4em; border-radius: 4px; background: var(--accent); color: #fff; }
+.comparison-note {
+  font-size: 0.8rem; color: var(--muted); padding: 1rem;
+  background: rgba(99,102,241,0.08); border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0; margin-bottom: 1.5rem;
+}
+/* Filter controls */
+.filters {
+  display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center;
+}
+.filters select, .filters input {
+  padding: 0.4rem 0.75rem; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--card); color: var(--text);
+  font-size: 0.85rem;
+}
+.filters label { font-size: 0.8rem; color: var(--muted); }
+.filter-group { display: flex; align-items: center; gap: 0.5rem; }
+.filter-count { font-size: 0.8rem; color: var(--accent); margin-left: 0.5rem; }
+/* Star rating chart */
+.star-chart { display: flex; align-items: center; gap: 1rem; }
+.star-bar { height: 30px; border-radius: 4px; min-width: 20px; }
+.star-label { width: 120px; font-size: 0.85rem; }
+.star-value { width: 80px; text-align: right; font-size: 0.85rem; font-weight: 600; }
+.star-pct { width: 60px; text-align: right; font-size: 0.85rem; color: var(--muted); }
+.correct-row { background: rgba(34,197,94,0.05); }
+.error-row { background: rgba(239,68,68,0.05); }
+</style>
+</head>
+<body>
+<h1>Sentiment & Emotion Classification Dashboard</h1>
+<p class="subtitle">Amazon Gift Card Reviews — MBAX 6418 Assignment 1 • LLM-powered (Qwen3.6-35B-A3B) + NRC Lexicon • 152,410 reviews available, 100 imbalanced + 150 balanced sample analyzed</p>
+
+<!-- Step 2: Headline Metrics -->
+<div class="section">
+  <div class="section-title">Step 2 — First 100 Reviews <span class="tag">IMBALANCED</span></div>
+  <div class="grid grid-4" id="metrics-step2"></div>
+</div>
+
+<!-- Step 2: Accuracy Breakdown -->
+<div class="section">
+  <div class="section-title">Per-Class Accuracy (Step 2)</div>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>2-Class Confusion Matrix</h3>
+      <div id="confusion-table"></div>
+    </div>
+    <div class="card">
+      <h3>Accuracy by Sentiment</h3>
+      <div class="chart-container"><canvas id="accuracy-bar"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 2: Error Clustering -->
+<div class="section">
+  <div class="section-title">Error Clustering (Step 2)</div>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Error Types</h3>
+      <div class="chart-container"><canvas id="error-pie"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Star Rating Distribution (Full Dataset)</h3>
+      <div class="chart-container"><canvas id="star-bar-chart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Star Rating vs Sentiment -->
+<div class="section">
+  <div class="section-title">Star Rating vs Predicted Sentiment</div>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>Full Dataset Star Ratings</h3>
+      <div class="chart-container"><canvas id="star-histogram"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Predicted Sentiment by Star Rating</h3>
+      <div class="chart-container"><canvas id="sentiment-stars"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 6: 3-Class Results -->
+<div class="section">
+  <div class="section-title">Step 6 — 3-Class Classification <span class="tag">BALANCED SAMPLE</span></div>
+  <div class="grid grid-4" id="metrics-step6"></div>
+  <div class="grid grid-3" style="margin-top:1.25rem">
+    <div class="card">
+      <h3>Per-Class Accuracy</h3>
+      <div class="chart-container"><canvas id="accuracy3-bar"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Predicted Sentiment Distribution</h3>
+      <div class="chart-container"><canvas id="sentiment-pie"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>True Sentiment Distribution</h3>
+      <div class="chart-container"><canvas id="sentiment-pie-true"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 6: Error Clustering -->
+<div class="section">
+  <div class="section-title">Error Clustering (Step 6)</div>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>3-Class Error Types</h3>
+      <div class="chart-container"><canvas id="error3-pie"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>3-Class Confusion Matrix</h3>
+      <div id="confusion3-table"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 5: Emotion Detection -->
+<div class="section">
+  <div class="section-title">Step 5 — Emotion Detection <span class="tag">BALANCED SAMPLE</span></div>
+  <div class="comparison-note">
+    Two methods used: <strong>LLM-based</strong> (Qwen3.6 via OpenAI-compatible endpoint) and <strong>NRC Word-Emotion Lexicon</strong> (word-list matching). Agreement is 10%, reflecting divergent approaches: lexicon is biased toward high-frequency words like "anticipation", while the LLM is context-aware but clusters around "anger" and "joy".
+  </div>
+  <div class="grid grid-4" id="metrics-emotions"></div>
+  <div class="grid grid-3" style="margin-top:1.25rem">
+    <div class="card">
+      <h3>LLM Emotion Distribution</h3>
+      <div class="chart-container"><canvas id="emotion-llm-bar"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>NRC Emotion Distribution</h3>
+      <div class="chart-container"><canvas id="emotion-nrc-bar"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Emotion Distribution by True Sentiment</h3>
+      <div class="chart-container"><canvas id="emotion-by-sentiment"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Step 4: Interactive Per-Review Detail -->
+<div class="section">
+  <div class="section-title">Step 4 — Per-Review Detail <span class="tag">INTERACTIVE FILTERING</span></div>
+  <div class="card">
+    <div class="filters">
+      <div class="filter-group">
+        <label>Sentiment:</label>
+        <select id="filter-sentiment">
+          <option value="all">All</option>
+          <option value="POSITIVE">POSITIVE</option>
+          <option value="NEGATIVE">NEGATIVE</option>
+          <option value="NEUTRAL">NEUTRAL</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Correctness:</label>
+        <select id="filter-correctness">
+          <option value="all">All</option>
+          <option value="correct">Correct Only</option>
+          <option value="error">Errors Only</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>LLM Emotion:</label>
+        <select id="filter-emotion">
+          <option value="all">All</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Rating:</label>
+        <select id="filter-rating">
+          <option value="all">All</option>
+          <option value="5">5 stars</option>
+          <option value="4">4 stars</option>
+          <option value="3">3 stars</option>
+          <option value="2">2 stars</option>
+          <option value="1">1 star</option>
+        </select>
+      </div>
+      <span class="filter-count" id="filter-count">0 rows</span>
+    </div>
+    <div class="chart-container" style="height:500px; overflow-y:auto;" id="detail-table-container"></div>
+  </div>
+</div>
+
+<script>
+const DATA = JSON.parse(decodeURIComponent("%DASHBOARD_DATA_PLACEHOLDER%"));
+
+// Render metrics
+document.getElementById('metrics-step2').innerHTML = `
+  <div class="card"><div class="metric accent">${DATA.step2.total}</div><div class="metric-label">Reviews Classified</div></div>
+  <div class="card"><div class="metric green">${DATA.step2.accuracy}%</div><div class="metric-label">Overall Accuracy</div></div>
+  <div class="card"><div class="metric green">${DATA.step2.tp} TP</div><div class="metric-label">True Positives</div></div>
+  <div class="card"><div class="metric red">${DATA.step2.fn} FN</div><div class="metric-label">False Negatives</div></div>
+`;
+
+document.getElementById('metrics-step6').innerHTML = `
+  <div class="card"><div class="metric accent">${DATA.step6.total}</div><div class="metric-label">Balanced Reviews</div></div>
+  <div class="card"><div class="metric orange">${DATA.step6.accuracy}%</div><div class="metric-label">Overall Accuracy</div></div>
+  <div class="card"><div class="metric yellow">1:1:1</div><div class="metric-label">Sample Distribution (Balanced)</div></div>
+  <div class="card"><div class="metric red">${DATA.emotion_agreement.pct}%</div><div class="metric-label">LLM/NRC Emotion Agreement</div></div>
+`;
+
+document.getElementById('metrics-emotions').innerHTML = `
+  <div class="card"><div class="metric accent2">8</div><div class="metric-label">Emotion Categories</div></div>
+  <div class="card"><div class="metric green">joy</div><div class="metric-label">Most Common LLM Emotion</div></div>
+  <div class="card"><div class="metric orange">anticipation</div><div class="metric-label">Most Common NRC Emotion</div></div>
+  <div class="card"><div class="metric red">${DATA.emotion_agreement.pct}%</div><div class="metric-label">Cross-Method Agreement</div></div>
+`;
+
+// Confusion matrix (2-class)
+let cmHTML = '<table><tr><th>Predicted \\ True</th><th>POSITIVE</th><th>NEGATIVE</th></tr>';
+cmHTML += '<tr><td><strong>POSITIVE</strong></td><td style="color:var(--green)">' + DATA.step2.tp + '</td><td style="color:var(--red)">' + DATA.step2.fp + '</td></tr>';
+cmHTML += '<tr><td><strong>NEGATIVE</strong></td><td style="color:var(--red)">' + DATA.step2.fn + '</td><td style="color:var(--green)">' + DATA.step2.tn + '</td></tr>';
+cmHTML += '</table>';
+document.getElementById('confusion-table').innerHTML = cmHTML;
+
+// 3-class confusion matrix
+let cm3HTML = '<table><tr><th>Predicted \\ True</th><th>POSITIVE</th><th>NEGATIVE</th><th>NEUTRAL</th></tr>';
+cm3HTML += '<tr><td><strong>POSITIVE</strong></td><td>' + DATA.step6.confusion.PP + '</td><td>' + DATA.step6.confusion.PN + '</td><td>' + DATA.step6.confusion.PT + '</td></tr>';
+cm3HTML += '<tr><td><strong>NEGATIVE</strong></td><td>' + DATA.step6.confusion.NP + '</td><td>' + DATA.step6.confusion.NN + '</td><td>' + DATA.step6.confusion.NT + '</td></tr>';
+cm3HTML += '<tr><td><strong>NEUTRAL</strong></td><td>' + DATA.step6.confusion.TP + '</td><td>' + DATA.step6.confusion.TN + '</td><td>' + DATA.step6.confusion.TT + '</td></tr>';
+cm3HTML += '</table>';
+document.getElementById('confusion3-table').innerHTML = cm3HTML;
+
+// Charts
+const commonOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: '#8b8fa3', font: { size: 11 } } } }
+};
+
+// Accuracy bar (2-class)
+new Chart(document.getElementById('accuracy-bar'), {
+  type: 'bar',
+  data: {
+    labels: ['POSITIVE', 'NEGATIVE'],
+    datasets: [{
+      label: 'Per-Class Accuracy (%)',
+      data: [DATA.step2.perClassAccuracy.POSITIVE, DATA.step2.perClassAccuracy.NEGATIVE],
+      backgroundColor: ['#22c55e', '#ef4444'],
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    ...commonOptions,
+    scales: {
+      y: { max: 100, grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } },
+      x: { grid: { display: false }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// 3-class accuracy bar
+new Chart(document.getElementById('accuracy3-bar'), {
+  type: 'bar',
+  data: {
+    labels: ['POSITIVE', 'NEUTRAL', 'NEGATIVE'],
+    datasets: [{
+      label: 'Per-Class Accuracy (%)',
+      data: [DATA.step6.per_class_accuracy.POSITIVE, DATA.step6.per_class_accuracy.NEUTRAL, DATA.step6.per_class_accuracy.NEGATIVE],
+      backgroundColor: ['#22c55e', '#eab308', '#ef4444'],
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    ...commonOptions,
+    scales: {
+      y: { max: 100, grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } },
+      x: { grid: { display: false }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Sentiment pie (predicted) - should be 50:50:50 for balanced
+new Chart(document.getElementById('sentiment-pie'), {
+  type: 'doughnut',
+  data: {
+    labels: ['POSITIVE', 'NEUTRAL', 'NEGATIVE'],
+    datasets: [{
+      data: [
+        DATA.step6.confusion.PP + DATA.step6.confusion.PN + DATA.step6.confusion.PT,
+        DATA.step6.confusion.TP + DATA.step6.confusion.TN + DATA.step6.confusion.TT,
+        DATA.step6.confusion.NP + DATA.step6.confusion.NN + DATA.step6.confusion.NT
+      ],
+      backgroundColor: ['#22c55e', '#eab308', '#ef4444'],
+      borderWidth: 0,
+    }]
+  },
+  options: { ...commonOptions, cutout: '60%' }
+});
+
+// True sentiment pie
+new Chart(document.getElementById('sentiment-pie-true'), {
+  type: 'doughnut',
+  data: {
+    labels: ['POSITIVE', 'NEUTRAL', 'NEGATIVE'],
+    datasets: [{
+      data: [DATA.step6.pos_total, DATA.step6.neu_total, DATA.step6.neg_total],
+      backgroundColor: ['#22c55e', '#eab308', '#ef4444'],
+      borderWidth: 0,
+    }]
+  },
+  options: { ...commonOptions, cutout: '60%' }
+});
+
+// Error pie (Step 2)
+new Chart(document.getElementById('error-pie'), {
+  type: 'doughnut',
+  data: {
+    labels: ['False Neg (POS as NEG)', 'False Pos (NEG as POS)'],
+    datasets: [{
+      data: [DATA.step2.fn, DATA.step2.fp],
+      backgroundColor: ['#ef4444', '#f97316'],
+      borderWidth: 0,
+    }]
+  },
+  options: {
+    ...commonOptions, cutout: '60%',
+    plugins: { ...commonOptions.plugins, tooltip: { enabled: true } }
+  }
+});
+
+// 3-class error pie
+const errorLabels = ['NEUTRAL→POS', 'NEUTRAL→NEG', 'POS→NEG', 'NEG→POS', 'POS→NEUTRAL', 'NEG→NEUTRAL'];
+const errorCounts = [
+  DATA.step6.confusion.TP,
+  DATA.step6.confusion.TN,
+  DATA.step6.confusion.PN,
+  DATA.step6.confusion.NP,
+  DATA.step6.confusion.PT,
+  DATA.step6.confusion.NT
+];
+new Chart(document.getElementById('error3-pie'), {
+  type: 'doughnut',
+  data: {
+    labels: errorLabels,
+    datasets: [{
+      data: errorCounts,
+      backgroundColor: ['#eab308', '#eab308', '#ef4444', '#ef4444', '#f97316', '#f97316'],
+      borderWidth: 0,
+    }]
+  },
+  options: { ...commonOptions, cutout: '60%' }
+});
+
+// LLM emotion bar
+const llmEmotions = ['anger', 'anticipation', 'disgust', 'fear', 'joy', 'sadness', 'surprise', 'trust'];
+new Chart(document.getElementById('emotion-llm-bar'), {
+  type: 'bar',
+  data: {
+    labels: llmEmotions,
+    datasets: [{
+      label: 'Count',
+      data: llmEmotions.map(e => DATA.emotion_llm[e] || 0),
+      backgroundColor: '#6366f1',
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    ...commonOptions, indexAxis: 'y',
+    scales: {
+      x: { grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } },
+      y: { grid: { display: false }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// NRC emotion bar
+new Chart(document.getElementById('emotion-nrc-bar'), {
+  type: 'bar',
+  data: {
+    labels: llmEmotions,
+    datasets: [{
+      label: 'Count',
+      data: llmEmotions.map(e => DATA.emotion_nrc[e] || 0),
+      backgroundColor: '#22d3ee',
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    ...commonOptions, indexAxis: 'y',
+    scales: {
+      x: { grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } },
+      y: { grid: { display: false }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Emotion by sentiment (stacked bar)
+new Chart(document.getElementById('emotion-by-sentiment'), {
+  type: 'bar',
+  data: {
+    labels: ['POSITIVE', 'NEGATIVE', 'NEUTRAL'],
+    datasets: llmEmotions.map(e => ({
+      label: e,
+      data: [
+        DATA.emotion_by_sentiment.POSITIVE[e] || 0,
+        DATA.emotion_by_sentiment.NEGATIVE[e] || 0,
+        DATA.emotion_by_sentiment.NEUTRAL[e] || 0
+      ],
+      backgroundColor: {
+        anger: '#ef4444', anticipation: '#8b8fa3', disgust: '#f97316',
+        fear: '#a855f7', joy: '#22c55e', sadness: '#6366f1',
+        surprise: '#eab308', trust: '#22d3ee'
+      }[e],
+    })),
+  },
+  options: {
+    ...commonOptions,
+    scales: {
+      x: { stacked: true, grid: { display: false }, ticks: { color: '#8b8fa3' } },
+      y: { stacked: true, grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Star rating histogram (full dataset)
+new Chart(document.getElementById('star-histogram'), {
+  type: 'bar',
+  data: {
+    labels: ['1★', '2★', '3★', '4★', '5★'],
+    datasets: [{
+      label: 'Count',
+      data: DATA.stars.map(s => s[1]),
+      backgroundColor: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#22c55e'],
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    ...commonOptions,
+    scales: {
+      y: { grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } },
+      x: { grid: { display: false }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Star vs sentiment (grouped bar)
+const starData = {
+  '1': { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 },
+  '2': { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 },
+  '3': { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 },
+  '4': { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 },
+  '5': { POSITIVE: 0, NEUTRAL: 0, NEGATIVE: 0 },
+};
+DATA.review_rows.forEach(r => {
+  const s = r.rating.toString();
+  if (starData[s]) starData[s][r.true_sentiment]++;
+});
+new Chart(document.getElementById('sentiment-stars'), {
+  type: 'bar',
+  data: {
+    labels: ['1★', '2★', '3★', '4★', '5★'],
+    datasets: [
+      { label: 'POSITIVE', data: ['5','4','3','2','1'].map(s => starData[s].POSITIVE), backgroundColor: '#22c55e', borderRadius: 3 },
+      { label: 'NEUTRAL', data: ['5','4','3','2','1'].map(s => starData[s].NEUTRAL), backgroundColor: '#eab308', borderRadius: 3 },
+      { label: 'NEGATIVE', data: ['5','4','3','2','1'].map(s => starData[s].NEGATIVE), backgroundColor: '#ef4444', borderRadius: 3 },
+    ]
+  },
+  options: {
+    ...commonOptions,
+    scales: {
+      y: { stacked: true, grid: { color: '#2a2d3a' }, ticks: { color: '#8b8fa3' } },
+      x: { grid: { display: false }, ticks: { color: '#8b8fa3' } }
+    }
+  }
+});
+
+// Filter population
+const emotionSelect = document.getElementById('filter-emotion');
+const emotions = Object.keys(DATA.emotion_llm).sort();
+emotions.forEach(e => {
+  const opt = document.createElement('option');
+  opt.value = e;
+  opt.textContent = e.charAt(0).toUpperCase() + e.slice(1);
+  emotionSelect.appendChild(opt);
+});
+
+// Render table
+function renderTable(rows) {
+  let html = '<table><thead><tr><th>#</th><th>Rating</th><th>True</th><th>Predicted</th><th>Correct</th><th>LLM Emotion</th><th>NRC Emotion</th><th>Match</th><th>Title</th></tr></thead><tbody>';
+  rows.forEach(r => {
+    const cls = r.correct ? 'correct-row' : 'error-row';
+    html += '<tr class="' + cls + '">' +
+      '<td>' + r.index + '</td>' +
+      '<td>' + r.rating.toFixed(1) + '★</td>' +
+      '<td><span class="badge ' + sentimentClass(r.true_sentiment) + '">' + r.true_sentiment + '</span></td>' +
+      '<td><span class="badge ' + sentimentClass(r.predicted_sentiment) + '">' + r.predicted_sentiment + '</span></td>' +
+      '<td>' + (r.correct ? '✓' : '✗') + '</td>' +
+      '<td>' + r.llm_emotion + '</td>' +
+      '<td>' + r.nrc_emotion + '</td>' +
+      '<td>' + (r.emotions_agree ? '✓' : '✗') + '</td>' +
+      '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + r.title.replace(/"/g, '&quot;') + '">' + r.title + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('detail-table-container').innerHTML = html;
+}
+
+function sentimentClass(s) {
+  if (s === 'POSITIVE') return 'positive';
+  if (s === 'NEGATIVE') return 'negative';
+  return 'neutral';
+}
+
+// Initial render
+renderTable(DATA.review_rows);
+
+// Filtering
+function applyFilters() {
+  const sent = document.getElementById('filter-sentiment').value;
+  const corr = document.getElementById('filter-correctness').value;
+  const emo = document.getElementById('filter-emotion').value;
+  const rat = document.getElementById('filter-rating').value;
+
+  let filtered = DATA.review_rows.filter(r => {
+    if (sent !== 'all' && r.true_sentiment !== sent) return false;
+    if (corr === 'correct' && !r.correct) return false;
+    if (corr === 'error' && r.correct) return false;
+    if (emo !== 'all' && r.llm_emotion !== emo) return false;
+    if (rat !== 'all' && r.rating.toString() !== rat) return false;
+    return true;
+  });
+
+  renderTable(filtered);
+  document.getElementById('filter-count').textContent = filtered.length + ' rows';
+}
+
+document.getElementById('filter-sentiment').addEventListener('change', applyFilters);
+document.getElementById('filter-correctness').addEventListener('change', applyFilters);
+document.getElementById('filter-emotion').addEventListener('change', applyFilters);
+document.getElementById('filter-rating').addEventListener('change', applyFilters);
+</script>
+</body>
+</html>
