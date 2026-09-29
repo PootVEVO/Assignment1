@@ -132,7 +132,7 @@ Actual NEUT      6    34    10
 - The LLM heavily clusters around **anger** and **joy**, reflecting the polarized nature of the Amazon reviews.
 - The NRC lexicon heavily favors **anticipation** (a generic, high-frequency English word), producing a very different distribution.
 - Only 12.5% agreement (15/120 reviews with both predictions) between methods, highlighting the fundamental difference between context-aware LLM reasoning and word-list matching.
-- Emotion distributions vary significantly by true sentiment: POSITIVE reviews predict joy 45/50 times, while NEUTRAL reviews show the most diverse emotion spread.
+- Emotion distributions vary significantly by true sentiment: POSITIVE reviews predict joy 41/50 times (82%), NEUTRAL shows the most diverse spread, and NEGATIVE reviews cluster around anger.
 
 ## Dashboard
 
