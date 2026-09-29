@@ -1,0 +1,21 @@
+# Large dataset files
+Gift_Cards.jsonl.gz
+NRC-Emotion-Lexicon.zip
+
+# Build artifacts
+build_dashboard.py
+build_dashboard_data.py
+compile_dashboard.py
+dashboard_data.json
+dashboard_template.html
+dashboard_top.png
+
+# Screenshot extras
+dashboard_screenshot2.png
+
+# OS junk
+__MACOSX/
+
+# Python cache
+__pycache__/
+*.pyc
